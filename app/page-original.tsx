@@ -1,147 +1,60 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Plus, Wallet, TrendingUp, TrendingDown, DollarSign, Users, Receipt } from 'lucide-react';
-import Link from 'next/link';
-
-// Mock data types
-type Account = {
-  id: string;
-  name: string;
-  type: 'Income' | 'Storage' | 'Investment' | 'Asset' | 'Clone' | 'Expense';
-  currency: string;
-  balance: number;
-  subtype?: string;
-  asset_type?: string;
-  asset_status?: string;
-  notes?: string;
-};
-
-type Transaction = {
-  id: string;
-  date: string;
-  from_account_id?: string;
-  to_account_id: string;
-  amount: number;
-  currency: string;
-  fee?: number;
-  notes?: string;
-  from_account?: { name: string };
-  to_account?: { name: string };
-};
-
-// Mock data
-const MOCK_ACCOUNTS: Account[] = [
-  { id: '1', name: 'Bank Account (USD)', type: 'Storage', currency: 'USD', balance: 5420.50, subtype: 'Checking' },
-  { id: '2', name: 'Cash Wallet (UAH)', type: 'Storage', currency: 'UAH', balance: 12300, subtype: 'Cash' },
-  { id: '3', name: 'Salary', type: 'Income', currency: 'USD', balance: 8500, subtype: 'Monthly' },
-  { id: '4', name: 'Freelance', type: 'Income', currency: 'USD', balance: 3200, subtype: 'Variable' },
-  { id: '5', name: 'Groceries', type: 'Expense', currency: 'USD', balance: 450, subtype: 'Monthly' },
-  { id: '6', name: 'Rent', type: 'Expense', currency: 'USD', balance: 1200, subtype: 'Monthly' },
-  { id: '7', name: 'NVDA Stock', type: 'Asset', currency: 'USD', balance: 2400, asset_type: 'Stock', asset_status: 'Active' },
-  { id: '8', name: 'Crypto Portfolio', type: 'Investment', currency: 'USD', balance: 8750 },
-];
-
-const MOCK_TRANSACTIONS: Transaction[] = [
-  {
-    id: '1',
-    date: '2026-02-20',
-    from_account_id: '3',
-    to_account_id: '1',
-    amount: 8500,
-    currency: 'USD',
-    notes: 'February salary',
-    from_account: { name: 'Salary' },
-    to_account: { name: 'Bank Account (USD)' },
-  },
-  {
-    id: '2',
-    date: '2026-02-19',
-    from_account_id: '1',
-    to_account_id: '5',
-    amount: 85.50,
-    currency: 'USD',
-    notes: 'Groceries - Silpo',
-    from_account: { name: 'Bank Account (USD)' },
-    to_account: { name: 'Groceries' },
-  },
-  {
-    id: '3',
-    date: '2026-02-18',
-    from_account_id: '4',
-    to_account_id: '1',
-    amount: 450,
-    currency: 'USD',
-    notes: 'Website project payment',
-    from_account: { name: 'Freelance' },
-    to_account: { name: 'Bank Account (USD)' },
-  },
-  {
-    id: '4',
-    date: '2026-02-15',
-    from_account_id: '1',
-    to_account_id: '6',
-    amount: 1200,
-    currency: 'USD',
-    notes: 'February rent',
-    from_account: { name: 'Bank Account (USD)' },
-    to_account: { name: 'Rent' },
-  },
-  {
-    id: '5',
-    date: '2026-02-14',
-    from_account_id: '1',
-    to_account_id: '8',
-    amount: 500,
-    currency: 'USD',
-    notes: 'BTC purchase',
-    from_account: { name: 'Bank Account (USD)' },
-    to_account: { name: 'Crypto Portfolio' },
-  },
-  {
-    id: '6',
-    date: '2026-02-12',
-    from_account_id: '1',
-    to_account_id: '5',
-    amount: 120.30,
-    currency: 'USD',
-    notes: 'Weekly groceries',
-    from_account: { name: 'Bank Account (USD)' },
-    to_account: { name: 'Groceries' },
-  },
-  {
-    id: '7',
-    date: '2026-02-10',
-    from_account_id: '1',
-    to_account_id: '7',
-    amount: 600,
-    currency: 'USD',
-    notes: 'Bought 3 NVDA shares @ $200',
-    from_account: { name: 'Bank Account (USD)' },
-    to_account: { name: 'NVDA Stock' },
-  },
-];
+import { supabase } from '@/lib/supabase';
+import { Account, Transaction } from '@/lib/types';
+import { Plus, Wallet, TrendingUp, TrendingDown, DollarSign } from 'lucide-react';
 
 export default function Dashboard() {
-  const [accounts, setAccounts] = useState<Account[]>(MOCK_ACCOUNTS);
-  const [transactions, setTransactions] = useState<Transaction[]>(MOCK_TRANSACTIONS);
+  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddAccount, setShowAddAccount] = useState(false);
   const [showAddTransaction, setShowAddTransaction] = useState(false);
 
-  // Simulate loading
+  // Fetch data
   useEffect(() => {
-    setTimeout(() => setLoading(false), 500);
+    fetchAccounts();
+    fetchTransactions();
   }, []);
+
+  const fetchAccounts = async () => {
+    setLoading(true);
+    const { data, error } = await supabase
+      .from('accounts')
+      .select('*')
+      .order('created_at', { ascending: false });
+    
+    if (!error && data) {
+      setAccounts(data);
+    }
+    setLoading(false);
+  };
+
+  const fetchTransactions = async () => {
+    const { data, error } = await supabase
+      .from('transactions')
+      .select(`
+        *,
+        from_account:from_account_id(name),
+        to_account:to_account_id(name)
+      `)
+      .order('date', { ascending: false })
+      .limit(50);
+    
+    if (!error && data) {
+      setTransactions(data);
+    }
+  };
 
   // Calculate stats
   const totalBalance = accounts
     .filter(a => ['Storage', 'Income'].includes(a.type))
-    .reduce((sum, a) => sum + a.balance, 0);
+    .reduce((sum, a) => sum + Number(a.balance), 0);
 
   const totalAssets = accounts
     .filter(a => a.type === 'Asset' && a.asset_status === 'Active')
-    .reduce((sum, a) => sum + a.balance, 0);
+    .reduce((sum, a) => sum + Number(a.balance), 0);
 
   const thisMonthIncome = transactions
     .filter(t => {
@@ -151,7 +64,7 @@ export default function Dashboard() {
              txDate.getFullYear() === now.getFullYear() &&
              t.to_account_id && accounts.find(a => a.id === t.to_account_id && a.type === 'Income');
     })
-    .reduce((sum, t) => sum + t.amount, 0);
+    .reduce((sum, t) => sum + Number(t.amount), 0);
 
   const thisMonthExpenses = transactions
     .filter(t => {
@@ -161,49 +74,12 @@ export default function Dashboard() {
              txDate.getFullYear() === now.getFullYear() &&
              t.from_account_id && accounts.find(a => a.id === t.from_account_id && a.type === 'Expense');
     })
-    .reduce((sum, t) => sum + t.amount, 0);
-
-  const handleAddAccount = (newAccount: Omit<Account, 'id'>) => {
-    const account: Account = {
-      ...newAccount,
-      id: String(accounts.length + 1),
-    };
-    setAccounts([...accounts, account]);
-  };
-
-  const handleAddTransaction = (newTx: Omit<Transaction, 'id' | 'from_account' | 'to_account'>) => {
-    const fromAcc = accounts.find(a => a.id === newTx.from_account_id);
-    const toAcc = accounts.find(a => a.id === newTx.to_account_id);
-    
-    const transaction: Transaction = {
-      ...newTx,
-      id: String(transactions.length + 1),
-      from_account: fromAcc ? { name: fromAcc.name } : undefined,
-      to_account: toAcc ? { name: toAcc.name } : undefined,
-    };
-    
-    // Update balances
-    if (fromAcc) {
-      setAccounts(accounts.map(a => 
-        a.id === fromAcc.id ? { ...a, balance: a.balance - newTx.amount } : a
-      ));
-    }
-    if (toAcc) {
-      setAccounts(accounts.map(a => 
-        a.id === toAcc.id ? { ...a, balance: a.balance + newTx.amount } : a
-      ));
-    }
-    
-    setTransactions([transaction, ...transactions]);
-  };
+    .reduce((sum, t) => sum + Number(t.amount), 0);
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-50">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading FinPassport...</p>
-        </div>
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
       </div>
     );
   }
@@ -213,12 +89,7 @@ export default function Dashboard() {
       {/* Header */}
       <header className="bg-white border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex justify-between items-center">
-            <h1 className="text-2xl font-bold text-gray-900">💼 FinPassport</h1>
-            <span className="px-3 py-1 bg-yellow-100 text-yellow-800 text-sm font-medium rounded-full">
-              🧪 Demo Mode (Mock Data)
-            </span>
-          </div>
+          <h1 className="text-2xl font-bold text-gray-900">💼 FinPassport</h1>
         </div>
       </header>
 
@@ -251,41 +122,6 @@ export default function Dashboard() {
           />
         </div>
 
-        {/* Quick Actions */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-          <Link
-            href="/trips"
-            className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg shadow-lg p-6 text-white hover:shadow-xl transition-all transform hover:-translate-y-1"
-          >
-            <div className="flex items-center justify-between mb-4">
-              <Users className="w-10 h-10" />
-              <span className="px-3 py-1 bg-white bg-opacity-20 rounded-full text-sm font-medium">
-                NEW
-              </span>
-            </div>
-            <h3 className="text-2xl font-bold mb-2">Shared Trips</h3>
-            <p className="text-blue-100">
-              Split expenses with friends on trips. Auto-calculate who owes whom.
-            </p>
-          </Link>
-
-          <Link
-            href="/expenses"
-            className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg shadow-lg p-6 text-white hover:shadow-xl transition-all transform hover:-translate-y-1"
-          >
-            <div className="flex items-center justify-between mb-4">
-              <Receipt className="w-10 h-10" />
-              <span className="px-3 py-1 bg-white bg-opacity-20 rounded-full text-sm font-medium">
-                NEW
-              </span>
-            </div>
-            <h3 className="text-2xl font-bold mb-2">All Expenses</h3>
-            <p className="text-purple-100">
-              View all your expenses grouped by month with smart filters.
-            </p>
-          </Link>
-        </div>
-
         {/* Accounts Section */}
         <div className="bg-white rounded-lg shadow mb-8">
           <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
@@ -301,7 +137,7 @@ export default function Dashboard() {
           <div className="p-6">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {accounts.map(account => (
-                <AccountCard key={account.id} account={account} />
+                <AccountCard key={account.id} account={account} onUpdate={fetchAccounts} />
               ))}
             </div>
           </div>
@@ -331,9 +167,9 @@ export default function Dashboard() {
       {showAddAccount && (
         <AddAccountModal
           onClose={() => setShowAddAccount(false)}
-          onSuccess={(account) => {
-            handleAddAccount(account);
+          onSuccess={() => {
             setShowAddAccount(false);
+            fetchAccounts();
           }}
         />
       )}
@@ -341,9 +177,10 @@ export default function Dashboard() {
         <AddTransactionModal
           accounts={accounts}
           onClose={() => setShowAddTransaction(false)}
-          onSuccess={(transaction) => {
-            handleAddTransaction(transaction);
+          onSuccess={() => {
             setShowAddTransaction(false);
+            fetchTransactions();
+            fetchAccounts(); // Refresh balances
           }}
         />
       )}
@@ -368,7 +205,7 @@ function StatCard({ title, value, icon, bgColor }: any) {
   );
 }
 
-function AccountCard({ account }: { account: Account }) {
+function AccountCard({ account, onUpdate }: { account: Account; onUpdate: () => void }) {
   const typeColors: Record<string, string> = {
     Income: 'bg-green-100 text-green-800',
     Storage: 'bg-blue-100 text-blue-800',
@@ -387,7 +224,7 @@ function AccountCard({ account }: { account: Account }) {
         </span>
       </div>
       <p className="text-2xl font-bold text-gray-900 mb-2">
-        {account.currency} {account.balance.toFixed(2)}
+        {account.currency} {Number(account.balance).toFixed(2)}
       </p>
       {account.subtype && (
         <p className="text-sm text-gray-600">{account.subtype}</p>
@@ -413,7 +250,7 @@ function TransactionRow({ transaction }: { transaction: Transaction }) {
       <div className="flex justify-between items-center">
         <div>
           <p className="font-medium text-gray-900">
-            {transaction.from_account?.name || 'Income'} → {transaction.to_account?.name || 'Unknown'}
+            {transaction.from_account?.name || 'Unknown'} → {transaction.to_account?.name || 'Unknown'}
           </p>
           <p className="text-sm text-gray-600">{formatDate(transaction.date)}</p>
           {transaction.notes && (
@@ -422,10 +259,10 @@ function TransactionRow({ transaction }: { transaction: Transaction }) {
         </div>
         <div className="text-right">
           <p className="font-bold text-gray-900">
-            {transaction.currency} {transaction.amount.toFixed(2)}
+            {transaction.currency} {Number(transaction.amount).toFixed(2)}
           </p>
-          {transaction.fee && transaction.fee > 0 && (
-            <p className="text-sm text-gray-500">Fee: {transaction.fee.toFixed(2)}</p>
+          {transaction.fee && Number(transaction.fee) > 0 && (
+            <p className="text-sm text-gray-500">Fee: {Number(transaction.fee).toFixed(2)}</p>
           )}
         </div>
       </div>
@@ -433,7 +270,7 @@ function TransactionRow({ transaction }: { transaction: Transaction }) {
   );
 }
 
-function AddAccountModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (account: Omit<Account, 'id'>) => void }) {
+function AddAccountModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
   const [formData, setFormData] = useState({
     name: '',
     type: 'Storage' as Account['type'],
@@ -443,13 +280,22 @@ function AddAccountModal({ onClose, onSuccess }: { onClose: () => void; onSucces
     notes: '',
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    onSuccess({
-      ...formData,
-      balance: parseFloat(formData.balance),
-    });
+    const { error } = await supabase
+      .from('accounts')
+      .insert({
+        ...formData,
+        balance: parseFloat(formData.balance),
+        user_id: '00000000-0000-0000-0000-000000000000', // Mock user - replace with actual auth
+      });
+
+    if (!error) {
+      onSuccess();
+    } else {
+      alert('Error creating account: ' + error.message);
+    }
   };
 
   return (
@@ -518,6 +364,16 @@ function AddAccountModal({ onClose, onSuccess }: { onClose: () => void; onSucces
             />
           </div>
 
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Notes (optional)</label>
+            <textarea
+              value={formData.notes}
+              onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+              rows={3}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+          </div>
+
           <div className="flex gap-3 pt-4">
             <button
               type="button"
@@ -539,7 +395,7 @@ function AddAccountModal({ onClose, onSuccess }: { onClose: () => void; onSucces
   );
 }
 
-function AddTransactionModal({ accounts, onClose, onSuccess }: { accounts: Account[]; onClose: () => void; onSuccess: (tx: Omit<Transaction, 'id' | 'from_account' | 'to_account'>) => void }) {
+function AddTransactionModal({ accounts, onClose, onSuccess }: { accounts: Account[]; onClose: () => void; onSuccess: () => void }) {
   const [formData, setFormData] = useState({
     date: new Date().toISOString().split('T')[0],
     from_account_id: '',
@@ -550,14 +406,44 @@ function AddTransactionModal({ accounts, onClose, onSuccess }: { accounts: Accou
     notes: '',
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    onSuccess({
-      ...formData,
-      amount: parseFloat(formData.amount),
-      fee: parseFloat(formData.fee),
-    });
+    const { error } = await supabase
+      .from('transactions')
+      .insert({
+        ...formData,
+        amount: parseFloat(formData.amount),
+        fee: parseFloat(formData.fee),
+        user_id: '00000000-0000-0000-0000-000000000000', // Mock user
+      });
+
+    if (!error) {
+      // Update account balances
+      if (formData.from_account_id) {
+        const fromAccount = accounts.find(a => a.id === formData.from_account_id);
+        if (fromAccount) {
+          await supabase
+            .from('accounts')
+            .update({ balance: Number(fromAccount.balance) - parseFloat(formData.amount) })
+            .eq('id', formData.from_account_id);
+        }
+      }
+      
+      if (formData.to_account_id) {
+        const toAccount = accounts.find(a => a.id === formData.to_account_id);
+        if (toAccount) {
+          await supabase
+            .from('accounts')
+            .update({ balance: Number(toAccount.balance) + parseFloat(formData.amount) })
+            .eq('id', formData.to_account_id);
+        }
+      }
+      
+      onSuccess();
+    } else {
+      alert('Error creating transaction: ' + error.message);
+    }
   };
 
   return (
@@ -586,7 +472,7 @@ function AddTransactionModal({ accounts, onClose, onSuccess }: { accounts: Accou
               <option value="">None (Income)</option>
               {accounts.map(account => (
                 <option key={account.id} value={account.id}>
-                  {account.name} ({account.currency} {account.balance.toFixed(2)})
+                  {account.name} ({account.currency} {Number(account.balance).toFixed(2)})
                 </option>
               ))}
             </select>
@@ -603,7 +489,7 @@ function AddTransactionModal({ accounts, onClose, onSuccess }: { accounts: Accou
               <option value="">Select account</option>
               {accounts.map(account => (
                 <option key={account.id} value={account.id}>
-                  {account.name} ({account.currency} {account.balance.toFixed(2)})
+                  {account.name} ({account.currency} {Number(account.balance).toFixed(2)})
                 </option>
               ))}
             </select>
@@ -631,6 +517,17 @@ function AddTransactionModal({ accounts, onClose, onSuccess }: { accounts: Accou
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
             </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Fee (optional)</label>
+            <input
+              type="number"
+              step="0.01"
+              value={formData.fee}
+              onChange={(e) => setFormData({ ...formData, fee: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
           </div>
 
           <div>
